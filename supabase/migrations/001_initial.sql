@@ -1,9 +1,6 @@
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Properties
 CREATE TABLE IF NOT EXISTS properties (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   address TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('casa', 'departamento', 'cochera', 'local', 'otro')),
@@ -15,7 +12,7 @@ CREATE TABLE IF NOT EXISTS properties (
 
 -- Tenants
 CREATE TABLE IF NOT EXISTS tenants (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   dni TEXT,
@@ -29,7 +26,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 
 -- Contracts
 CREATE TABLE IF NOT EXISTS contracts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
   start_date DATE NOT NULL,
@@ -50,7 +47,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 
 -- Payments
 CREATE TABLE IF NOT EXISTS payments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contract_id UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
   period_month INTEGER NOT NULL CHECK (period_month BETWEEN 1 AND 12),
   period_year INTEGER NOT NULL,
@@ -71,7 +68,7 @@ CREATE TABLE IF NOT EXISTS payments (
 
 -- IPC Indexes (CREEBBA)
 CREATE TABLE IF NOT EXISTS ipc_indexes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
   year INTEGER NOT NULL,
   value NUMERIC(10,6) NOT NULL,
@@ -83,7 +80,7 @@ CREATE TABLE IF NOT EXISTS ipc_indexes (
 
 -- Rent Adjustments History
 CREATE TABLE IF NOT EXISTS rent_adjustments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contract_id UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
   adjustment_date DATE NOT NULL,
   previous_amount NUMERIC(12,2) NOT NULL,
@@ -99,7 +96,7 @@ CREATE TABLE IF NOT EXISTS rent_adjustments (
 
 -- Files
 CREATE TABLE IF NOT EXISTS files (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_type TEXT NOT NULL CHECK (entity_type IN ('contract', 'tenant', 'property')),
   entity_id UUID NOT NULL,
   file_name TEXT NOT NULL,
@@ -111,7 +108,7 @@ CREATE TABLE IF NOT EXISTS files (
 
 -- Notifications
 CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type TEXT NOT NULL,
   title TEXT NOT NULL,
   message TEXT NOT NULL,
@@ -146,6 +143,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop triggers if they exist, then recreate
+DROP TRIGGER IF EXISTS properties_updated_at ON properties;
+DROP TRIGGER IF EXISTS tenants_updated_at ON tenants;
+DROP TRIGGER IF EXISTS contracts_updated_at ON contracts;
+DROP TRIGGER IF EXISTS payments_updated_at ON payments;
+
 CREATE TRIGGER properties_updated_at BEFORE UPDATE ON properties FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER tenants_updated_at BEFORE UPDATE ON tenants FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER contracts_updated_at BEFORE UPDATE ON contracts FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -162,7 +165,17 @@ ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE receipt_counter ENABLE ROW LEVEL SECURITY;
 
--- Policies: only authenticated users can access
+-- Policies (drop first to avoid conflicts on re-run)
+DROP POLICY IF EXISTS "Auth users all" ON properties;
+DROP POLICY IF EXISTS "Auth users all" ON tenants;
+DROP POLICY IF EXISTS "Auth users all" ON contracts;
+DROP POLICY IF EXISTS "Auth users all" ON payments;
+DROP POLICY IF EXISTS "Auth users all" ON ipc_indexes;
+DROP POLICY IF EXISTS "Auth users all" ON rent_adjustments;
+DROP POLICY IF EXISTS "Auth users all" ON files;
+DROP POLICY IF EXISTS "Auth users all" ON notifications;
+DROP POLICY IF EXISTS "Auth users all" ON receipt_counter;
+
 CREATE POLICY "Auth users all" ON properties FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Auth users all" ON tenants FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Auth users all" ON contracts FOR ALL TO authenticated USING (true) WITH CHECK (true);
