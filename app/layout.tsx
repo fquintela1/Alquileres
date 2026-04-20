@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Alquileres | Panel de Administración",
   description: "Sistema de administración de propiedades en alquiler",
